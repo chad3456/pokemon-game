@@ -13,7 +13,7 @@ POKEMON_DATA = {
         "type": "Grass/Poison",
         "hp": 45,
         "attack": 49,
-        "image": "bulbasaur.png"
+        "image": "bulbasor.png"
     },
     "Charmander": {
         "type": "Fire",
