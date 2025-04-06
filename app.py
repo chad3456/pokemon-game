@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 
-# -- Load Pokémon data --
+# Load data from CSV
 @st.cache_data
 def load_pokemon_data():
     df = pd.read_csv("pokemon_data_with_images.csv")
@@ -10,14 +10,17 @@ def load_pokemon_data():
 
 pokemon_df = load_pokemon_data()
 
-# -- Utility --
+# Clean malformed image URLs
 def clean_url(url):
     return url.replace("https:https://", "https://").strip()
 
-# -- Initialize session state --
+# --- Preload 3 default Pokémon ---
+DEFAULT_TEAM_NAMES = ["Pikachu", "Bulbasaur", "Charmander"]
+
 if "team" not in st.session_state:
     st.session_state.team = [
-        pokemon_df[pokemon_df['name'].str.lower() == "pikachu"].iloc[0].to_dict()
+        pokemon_df[pokemon_df['name'] == name].iloc[0].to_dict()
+        for name in DEFAULT_TEAM_NAMES
     ]
     st.session_state.selected_pokemon = st.session_state.team[0]
     st.session_state.enemy_pokemon = None
@@ -25,17 +28,24 @@ if "team" not in st.session_state:
     st.session_state.status = ""
     st.session_state.last_outcome = ""
 
-# -- Choose new enemy --
+# Choose fair enemy (same type as selected Pokémon)
 def choose_enemy():
-    while True:
-        enemy = pokemon_df.sample(1).iloc[0].to_dict()
-        if enemy['name'] not in [p['name'] for p in st.session_state.team]:
-            break
+    selected_type = st.session_state.selected_pokemon['type']
+    enemy_options = pokemon_df[
+        (pokemon_df['type'] == selected_type) &
+        (~pokemon_df['name'].isin([p['name'] for p in st.session_state.team]))
+    ]
+    if len(enemy_options) == 0:
+        st.session_state.status = "🎉 You’ve collected all Pokémon of this type!"
+        st.session_state.enemy_pokemon = None
+        return
+
+    enemy = enemy_options.sample(1).iloc[0].to_dict()
     st.session_state.enemy_pokemon = enemy
     st.session_state.status = f"⚔️ {enemy['name']} appears!"
     st.session_state.last_outcome = ""
 
-# -- Battle Logic --
+# Battle logic
 def battle():
     player = st.session_state.selected_pokemon
     enemy = st.session_state.enemy_pokemon
@@ -56,7 +66,7 @@ def battle():
 
     st.session_state.enemy_pokemon = None
 
-# -- Display Pokémon Card --
+# UI Component to show a Pokémon
 def display_pokemon(pokemon, title):
     st.markdown(f"### {title}")
     st.image(clean_url(pokemon['image_url']), width=150)
@@ -64,25 +74,25 @@ def display_pokemon(pokemon, title):
     st.text(f"Type: {pokemon['type']}")
     st.text(f"HP: {pokemon['hp']} | Attack: {pokemon['attack']}")
 
-# -- Main UI --
-st.title("🔴 Pokémon Match – Choose & Fight")
-st.markdown("Win battles to collect Pokémon. Choose your fighter from your team!")
+# -- Main Layout --
+st.title("🔴 Pokémon Match – Type-Based Fair Fights")
+st.markdown("Choose your fighter and battle Pokémon of the same type!")
 
 st.markdown(f"### 💚 Lives: {st.session_state.lives}")
 
-# -- Select Pokémon from team --
+# Fighter selector
 team_names = [p['name'] for p in st.session_state.team]
 selected_name = st.selectbox("🧠 Choose your Pokémon to battle:", team_names)
 
-# Update selected Pokémon
+# Update selected
 st.session_state.selected_pokemon = next(p for p in st.session_state.team if p['name'] == selected_name)
 
-# Show selected Pokémon
-display_pokemon(st.session_state.selected_pokemon, "🧍 Your Chosen Pokémon")
+# Show chosen
+display_pokemon(st.session_state.selected_pokemon, "🧍 Your Pokémon")
 
 st.divider()
 
-# Show enemy
+# Enemy Pokémon section
 if st.session_state.enemy_pokemon:
     display_pokemon(st.session_state.enemy_pokemon, "🤖 Opponent")
     col1, col2 = st.columns(2)
@@ -91,12 +101,16 @@ if st.session_state.enemy_pokemon:
 else:
     st.button("🔍 Find Opponent", on_click=choose_enemy)
 
-# Show outcome
+# Result display
 if st.session_state.last_outcome:
     st.markdown("---")
     st.info(st.session_state.last_outcome)
 
-# Show current team at the bottom
+if st.session_state.status:
+    st.markdown("---")
+    st.write(st.session_state.status)
+
+# Show full team
 st.markdown("---")
 st.markdown("### 📦 Your Team:")
 cols = st.columns(min(5, len(st.session_state.team)))
