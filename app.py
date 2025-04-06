@@ -1,72 +1,87 @@
 import streamlit as st
-import pandas as pd
 import random
 
-# Load Pokémon data
-@st.cache_data
-def load_pokemon_data():
-    df = pd.read_csv("pokemon_data_with_images.csv")
-    return df
+# ---- Setup ----
+POKEMON_DATA = {
+    "Pikachu": {
+        "type": "Electric",
+        "hp": 35,
+        "attack": 55,
+        "image": "pikachu.png"
+    },
+    "Bulbasaur": {
+        "type": "Grass/Poison",
+        "hp": 45,
+        "attack": 49,
+        "image": "bulbasaur.png"
+    },
+    "Charmander": {
+        "type": "Fire",
+        "hp": 39,
+        "attack": 52,
+        "image": "charmander.png"
+    }
+}
 
-pokemon_df = load_pokemon_data()
-
-# --- Session State ---
-if "player_pokemon" not in st.session_state:
-    st.session_state.player_pokemon = pokemon_df[pokemon_df['name'] == "Pikachu"].iloc[0].to_dict()
-    st.session_state.enemy_pokemon = None
+if "player_team" not in st.session_state:
+    st.session_state.player_team = ["Pikachu"]
     st.session_state.lives = 3
+    st.session_state.ai_pokemon = None
     st.session_state.status = ""
     st.session_state.last_outcome = ""
 
-# --- Functions ---
-def choose_enemy():
-    enemy = pokemon_df.sample(1).iloc[0].to_dict()
-    st.session_state.enemy_pokemon = enemy
-    st.session_state.status = f"⚔️ {enemy['name']} appears!"
-    st.session_state.last_outcome = ""
+# ---- Functions ----
+def choose_new_ai():
+    choices = [p for p in POKEMON_DATA if p not in st.session_state.player_team]
+    if choices:
+        st.session_state.ai_pokemon = random.choice(choices)
+        st.session_state.status = f"AI challenges you with {st.session_state.ai_pokemon}!"
+        st.session_state.last_outcome = ""
+    else:
+        st.session_state.ai_pokemon = None
+        st.session_state.status = "You've collected all Pokémon!"
 
-def battle():
-    player = st.session_state.player_pokemon
-    enemy = st.session_state.enemy_pokemon
+def fight():
+    player = POKEMON_DATA[st.session_state.player_team[-1]]
+    enemy = POKEMON_DATA[st.session_state.ai_pokemon]
 
     player_power = player['attack'] + random.randint(0, 10)
     enemy_power = enemy['attack'] + random.randint(0, 10)
 
     if player_power >= enemy_power:
-        st.session_state.last_outcome = f"✅ You won! Power: {player_power} vs {enemy_power}"
-        st.session_state.player_pokemon = enemy  # Player adopts enemy
+        st.session_state.player_team.append(st.session_state.ai_pokemon)
+        st.session_state.last_outcome = f"You won! {st.session_state.ai_pokemon} added to your team!"
     else:
         st.session_state.lives -= 1
-        st.session_state.last_outcome = f"❌ You lost! Power: {player_power} vs {enemy_power}"
-        if st.session_state.lives <= 0:
-            st.session_state.last_outcome += "\n💀 Game Over!"
+        st.session_state.last_outcome = f"You lost the fight. Lives left: {st.session_state.lives}"
 
-    st.session_state.enemy_pokemon = None
+    choose_new_ai()
 
-# --- UI Helpers ---
-def display_pokemon(pokemon, title):
-    st.markdown(f"### {title}")
-    st.image(pokemon['image_url'], width=150)
-    st.markdown(f"**{pokemon['name']}**")
-    st.text(f"Type: {pokemon['type']}")
-    st.text(f"HP: {pokemon['hp']} | Attack: {pokemon['attack']}")
+def skip():
+    st.session_state.last_outcome = "You skipped the fight."
+    choose_new_ai()
 
-# --- Layout ---
-st.title("🔴 Pokémon Match – Web Version")
-st.markdown("Win battles to use new Pokémon. Lose 3 times and it's game over.")
+# ---- UI ----
+st.title("🔴 Pokémon Match – Streamlit Edition")
 
-st.markdown(f"### 💚 Lives: {st.session_state.lives}")
-display_pokemon(st.session_state.player_pokemon, "🧍 Your Pokémon")
+st.markdown(f"**Lives:** {st.session_state.lives}")
+st.markdown(f"**Your Team:** {', '.join(st.session_state.player_team)}")
+st.markdown("---")
 
-st.divider()
-
-if st.session_state.enemy_pokemon:
-    display_pokemon(st.session_state.enemy_pokemon, "🤖 Opponent")
-    col1, col2 = st.columns(2)
-    col1.button("⚔️ Fight", on_click=battle)
-    col2.button("⏭️ Skip", on_click=choose_enemy)
+if st.session_state.ai_pokemon:
+    p = POKEMON_DATA[st.session_state.ai_pokemon]
+    st.image(p["image"], width=150)
+    st.markdown(f"### {st.session_state.ai_pokemon}")
+    st.markdown(f"Type: {p['type']}  \nHP: {p['hp']} | Attack: {p['attack']}")
+    st.button("⚔️ Fight!", on_click=fight)
+    st.button("⏭️ Skip", on_click=skip)
 else:
-    st.button("🔍 Find Opponent", on_click=choose_enemy)
+    if st.session_state.lives <= 0:
+        st.error("Game Over! You lost all your lives.")
+    elif len(st.session_state.player_team) == len(POKEMON_DATA):
+        st.success("🎉 Congratulations! You collected all Pokémon!")
+    else:
+        st.button("Start Battle", on_click=choose_new_ai)
 
 if st.session_state.last_outcome:
     st.markdown("---")
