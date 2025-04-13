@@ -14,6 +14,53 @@ pokemon_df = load_pokemon_data()
 def clean_url(url):
     return url.replace("https:https://", "https://").strip()
 
+# ---- Styled card CSS ----
+card_css = """
+<style>
+.poke-card {
+    background: linear-gradient(145deg, #f3f3f3, #ffffff);
+    border-radius: 20px;
+    padding: 20px;
+    width: 100%;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    text-align: center;
+}
+.poke-card img {
+    width: 100px;
+    margin-bottom: 10px;
+}
+.poke-card h3 {
+    margin: 0;
+    font-size: 22px;
+    color: #333;
+}
+.poke-card .type {
+    font-weight: bold;
+    color: #666;
+    font-size: 16px;
+    margin-top: 5px;
+}
+.poke-card .power {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ff4081;
+    margin-top: 10px;
+}
+</style>
+"""
+st.markdown(card_css, unsafe_allow_html=True)
+
+def show_card(pokemon, power, title):
+    html = f"""
+    <div class="poke-card">
+        <img src="{clean_url(pokemon['image_url'])}" />
+        <h3>{pokemon['name']}</h3>
+        <div class="type">Type: {pokemon['type']}</div>
+        <div class="power">{title} Power: {power}</div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
 # --- Preload 3 default Pokémon ---
 DEFAULT_TEAM_NAMES = ["Pikachu", "Bulbasaur", "Charmander"]
 
@@ -66,14 +113,6 @@ def battle():
 
     st.session_state.enemy_pokemon = None
 
-# UI Component to show a Pokémon
-def display_pokemon(pokemon, title):
-    st.markdown(f"### {title}")
-    st.image(clean_url(pokemon['image_url']), width=150)
-    st.markdown(f"**{pokemon['name']}**")
-    st.text(f"Type: {pokemon['type']}")
-    st.text(f"HP: {pokemon['hp']} | Attack: {pokemon['attack']}")
-
 # -- Main Layout --
 st.title("🔴 Pokémon Match – Type-Based Fair Fights")
 st.markdown("Choose your fighter and battle Pokémon of the same type!")
@@ -87,17 +126,22 @@ selected_name = st.selectbox("🧠 Choose your Pokémon to battle:", team_names)
 # Update selected
 st.session_state.selected_pokemon = next(p for p in st.session_state.team if p['name'] == selected_name)
 
-# Show chosen
-display_pokemon(st.session_state.selected_pokemon, "🧍 Your Pokémon")
-
-st.divider()
-
 # Enemy Pokémon section
 if st.session_state.enemy_pokemon:
-    display_pokemon(st.session_state.enemy_pokemon, "🤖 Opponent")
     col1, col2 = st.columns(2)
-    col1.button("⚔️ Fight", on_click=battle)
-    col2.button("⏭️ Skip", on_click=choose_enemy)
+
+    player_power = st.session_state.selected_pokemon['attack'] + random.randint(0, 10)
+    enemy_power = st.session_state.enemy_pokemon['attack'] + random.randint(0, 10)
+
+    with col1:
+        show_card(st.session_state.selected_pokemon, player_power, "Your")
+
+    with col2:
+        show_card(st.session_state.enemy_pokemon, enemy_power, "Enemy")
+
+    col3, col4 = st.columns(2)
+    col3.button("⚔️ Fight", on_click=battle)
+    col4.button("⏭️ Skip", on_click=choose_enemy)
 else:
     st.button("🔍 Find Opponent", on_click=choose_enemy)
 
